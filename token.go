@@ -1,6 +1,22 @@
+// Package splittoken provides a simple implementation of a three part token
+// which is serialized to a string. They consist of an identifier, a secret part
+// and a usage identifier.
+//
+// These tokens are heavily inspired by GitHub's new tokens,
+// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/.
+//
+// A common use case for these token are whenever you need to issue something to
+// a user that can be used as a proof of identity, for email verification, etc.
+// You would usually want to store the secret part hashed in your own
+// application to prevent anyone with database access to impersonate a user by
+// reconstructing a token.
+//
+// This Paragon.ie post from 2017 describes this approach:
+// https://paragonie.com/blog/2017/02/split-tokens-token-based-authentication-protocols-without-side-channels.
 package splittoken
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
 	"encoding/binary"
 	"errors"
@@ -18,13 +34,10 @@ var enc = mustEnc(basex.NewEncoding(stdEnc))
 
 var (
 	ErrInvalidChecksum = errors.New("invalid checksum")
-	ErrInvalidSyntax = errors.New("invalid syntax")
+	ErrInvalidSyntax   = errors.New("invalid syntax")
 )
 
-// Token contains three pieces:
-// - A usage identifier
-// - A known serial number
-// - A secret value
+// Token is a split token.
 type Token string
 
 func (t Token) Secret() []byte {
@@ -85,12 +98,21 @@ func parse(t Token) (parts, error) {
 }
 
 // NewToken constructs a new token.
-func NewToken(usage string, serial uuid.UUID, secret []byte) (Token, error) {
+func New(usage string, serial uuid.UUID, secret []byte) (Token, error) {
 	return encode(parts{
 		usage:  usage,
 		serial: serial,
 		secret: secret,
 	})
+}
+
+func Generate(usage string, bytes uint) (Token, error) {
+	id := uuid.Must(uuid.NewRandom())
+	secret := make([]byte, bytes)
+	if _, err := rand.Read(secret); err != nil {
+		return "", fmt.Errorf("writing bytes: %v", err)
+	}
+	return New(usage, id, secret)
 }
 
 func encode(p parts) (Token, error) {
@@ -104,7 +126,7 @@ func encode(p parts) (Token, error) {
 		return "", ErrInvalidSyntax
 	}
 	bl := len(p.serial) + len(p.secret) + 4
-	bs := make([]byte,  bl, bl)
+	bs := make([]byte, bl, bl)
 	copy(bs[:16], p.serial[:])
 	copy(bs[16:], p.secret)
 

@@ -14,7 +14,7 @@ func FuzzNewToken(f *testing.F) {
 	namespaceTesting := uuid.Must(uuid.Parse("2034963f-6992-4349-9dcd-91178ddbf7c5"))
 	f.Fuzz(func(t *testing.T, usage string, idSeed string, secret []byte) {
 		id := uuid.NewSHA1(namespaceTesting, []byte(idSeed))
-		tk, err := splittoken.NewToken(usage, id, secret)
+		tk, err := splittoken.New(usage, id, secret)
 		if err != nil {
 			t.Skip()
 		}
